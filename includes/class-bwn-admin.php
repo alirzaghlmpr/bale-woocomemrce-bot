@@ -194,6 +194,19 @@ class BWN_Admin {
         $placeholders = BWN_Notifier::get_available_placeholders( $last_order );
         $meta_vars    = BWN_Notifier::get_order_meta_variables( $last_order );
         $log          = BWN_Notifier::get_log();
+
+        $payment_placeholders     = array();
+        $attribution_placeholders = array();
+        $order_placeholders       = array();
+        foreach ( $placeholders as $key => $data ) {
+            if ( strpos( $key, 'payment_' ) === 0 ) {
+                $payment_placeholders[ $key ] = $data;
+            } elseif ( strpos( $key, 'attribution_' ) === 0 ) {
+                $attribution_placeholders[ $key ] = $data;
+            } else {
+                $order_placeholders[ $key ] = $data;
+            }
+        }
         ?>
         <div class="bwn-wrap wrap">
             <h1>🔔 بله نوتیفایر <span class="bwn-badge">WooCommerce</span></h1>
@@ -288,7 +301,42 @@ class BWN_Admin {
 
                         <h3 style="font-size:14px;color:#1f2937;margin-top:15px;margin-bottom:12px;border-bottom:1px solid #e5e7eb;padding-bottom:6px;">🗂️ متغیرهای استاندارد سفارش</h3>
                         <div class="bwn-vars-list">
-                            <?php foreach ( $placeholders as $key => $data ) : ?>
+                            <?php foreach ( $order_placeholders as $key => $data ) : ?>
+                                <div class="bwn-var-item">
+                                    <div class="bwn-var-badge bwn-copyable" data-copy="<?php echo esc_attr( '{' . $key . '}' ); ?>" title="کلیک برای کپی">
+                                        <?php echo esc_html( '{' . $key . '}' ); ?>
+                                    </div>
+                                    <div class="bwn-var-details">
+                                        <span class="bwn-var-label"><?php echo esc_html( $data['label'] ); ?></span>
+                                        <span class="bwn-var-value" title="<?php echo esc_attr( $data['val'] ); ?>">
+                                            <?php echo esc_html( wp_trim_words( $data['val'], 8, '...' ) ?: '-' ); ?>
+                                        </span>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <h3 style="font-size:14px;color:#1f2937;margin-top:30px;margin-bottom:12px;border-bottom:1px solid #e5e7eb;padding-bottom:6px;">💳 درگاه پرداخت</h3>
+                        <div class="bwn-vars-list">
+                            <?php foreach ( $payment_placeholders as $key => $data ) : ?>
+                                <div class="bwn-var-item">
+                                    <div class="bwn-var-badge bwn-copyable" data-copy="<?php echo esc_attr( '{' . $key . '}' ); ?>" title="کلیک برای کپی">
+                                        <?php echo esc_html( '{' . $key . '}' ); ?>
+                                    </div>
+                                    <div class="bwn-var-details">
+                                        <span class="bwn-var-label"><?php echo esc_html( $data['label'] ); ?></span>
+                                        <span class="bwn-var-value" title="<?php echo esc_attr( $data['val'] ); ?>">
+                                            <?php echo esc_html( wp_trim_words( $data['val'], 8, '...' ) ?: '-' ); ?>
+                                        </span>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <h3 style="font-size:14px;color:#1f2937;margin-top:30px;margin-bottom:12px;border-bottom:1px solid #e5e7eb;padding-bottom:6px;">📈 اتریبیوشن سفارش (منبع ورودی)</h3>
+                        <p style="font-size:11px;color:#6b7280;margin-bottom:12px;line-height:1.5;">داده‌های ردیابی منبع سفارش که توسط خود ووکامرس (Order Attribution) ثبت می‌شود.</p>
+                        <div class="bwn-vars-list">
+                            <?php foreach ( $attribution_placeholders as $key => $data ) : ?>
                                 <div class="bwn-var-item">
                                     <div class="bwn-var-badge bwn-copyable" data-copy="<?php echo esc_attr( '{' . $key . '}' ); ?>" title="کلیک برای کپی">
                                         <?php echo esc_html( '{' . $key . '}' ); ?>

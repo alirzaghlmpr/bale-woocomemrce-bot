@@ -165,7 +165,13 @@ class BWN_Notifier {
             'billing_address' => array( 'label' => 'آدرس خریدار', 'val' => '' ),
             'billing_postcode'=> array( 'label' => 'کد پستی خریدار', 'val' => '' ),
             'customer_note'   => array( 'label' => 'توضیحات سفارش', 'val' => '' ),
+
+            'payment_method'       => array( 'label' => 'شناسه درگاه پرداخت', 'val' => '' ),
+            'payment_method_title' => array( 'label' => 'نام درگاه پرداخت', 'val' => '' ),
+            'payment_transaction_id' => array( 'label' => 'کد رهگیری / هش تراکنش', 'val' => '' ),
         );
+
+        $placeholders = array_merge( $placeholders, self::get_attribution_placeholder_defs() );
 
         if ( $order ) {
             $currency = get_woocommerce_currency_symbol();
@@ -205,12 +211,52 @@ class BWN_Notifier {
             $placeholders['billing_address']['val'] = trim( $order->get_billing_address_1() . ' ' . $order->get_billing_address_2() );
             $placeholders['billing_postcode']['val']= $order->get_billing_postcode();
             $placeholders['customer_note']['val']   = $order->get_customer_note();
+
+            $placeholders['payment_method']['val']         = $order->get_payment_method();
+            $placeholders['payment_method_title']['val']   = $order->get_payment_method_title();
+            $placeholders['payment_transaction_id']['val'] = $order->get_transaction_id();
+
+            foreach ( self::get_attribution_placeholder_defs() as $key => $data ) {
+                $field = substr( $key, strlen( 'attribution_' ) );
+                $placeholders[ $key ]['val'] = (string) $order->get_meta( '_wc_order_attribution_' . $field );
+            }
         } else {
             foreach ( $placeholders as $k => $v ) {
                 $placeholders[$k]['val'] = '(نمونه تستی)';
             }
         }
 
+        return $placeholders;
+    }
+
+    /**
+     * Definitions for WooCommerce Order Attribution placeholders.
+     * Mirrors the field list tracked by WooCommerce core (meta prefix `_wc_order_attribution_`).
+     */
+    public static function get_attribution_placeholder_defs() {
+        $fields = array(
+            'source_type'          => 'نوع منبع (attribution)',
+            'referrer'             => 'ارجاع‌دهنده (Referrer)',
+            'utm_campaign'         => 'کمپین (utm_campaign)',
+            'utm_source'           => 'منبع (utm_source)',
+            'utm_medium'           => 'رسانه (utm_medium)',
+            'utm_content'          => 'محتوا (utm_content)',
+            'utm_id'               => 'شناسه UTM (utm_id)',
+            'utm_term'             => 'عبارت جستجو (utm_term)',
+            'utm_source_platform'  => 'پلتفرم منبع (utm_source_platform)',
+            'utm_creative_format'  => 'فرمت تبلیغ (utm_creative_format)',
+            'utm_marketing_tactic' => 'تاکتیک بازاریابی (utm_marketing_tactic)',
+            'session_entry'        => 'صفحه ورود (session_entry)',
+            'session_start_time'   => 'زمان شروع نشست',
+            'session_pages'        => 'تعداد صفحات بازدید شده',
+            'session_count'        => 'تعداد نشست‌ها',
+            'user_agent'           => 'یوزر ایجنت مرورگر',
+        );
+
+        $placeholders = array();
+        foreach ( $fields as $field => $label ) {
+            $placeholders[ 'attribution_' . $field ] = array( 'label' => $label, 'val' => '' );
+        }
         return $placeholders;
     }
 
