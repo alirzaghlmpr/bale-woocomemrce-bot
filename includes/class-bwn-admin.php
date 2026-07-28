@@ -41,9 +41,10 @@ class BWN_Admin {
      */
     public static function sanitize_settings( $input ) {
         return array(
-            'bot_token'        => sanitize_text_field( $input['bot_token'] ?? '' ),
-            'chat_id'          => sanitize_text_field( $input['chat_id']   ?? '' ),
-            'message_template' => isset( $input['message_template'] ) ? wp_kses_post( $input['message_template'] ) : '',
+            'bot_token'               => sanitize_text_field( $input['bot_token'] ?? '' ),
+            'chat_id'                 => sanitize_text_field( $input['chat_id']   ?? '' ),
+            'message_template'        => isset( $input['message_template'] ) ? wp_kses_post( $input['message_template'] ) : '',
+            'message_template_manual' => isset( $input['message_template_manual'] ) ? wp_kses_post( $input['message_template_manual'] ) : '',
         );
     }
 
@@ -70,6 +71,15 @@ class BWN_Admin {
             @media (min-width: 900px) {
                 .bwn-grid{grid-template-columns: 3fr 2fr;}
             }
+            /* Grid/flex children default to a content-based min-width, so one
+               long unbreakable placeholder badge (e.g. {attribution_utm_
+               marketing_tactic}) forces its column wider instead of wrapping
+               — cascading all the way up to .bwn-wrap and pushing the whole
+               settings page into horizontal scroll. min-width:0 lets each
+               level actually shrink to the space it was given; word-break on
+               the badges lets long placeholder text wrap instead of forcing
+               width. */
+            .bwn-col-main, .bwn-col-sidebar{min-width:0}
             .bwn-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:24px 28px;margin-bottom:24px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05),0 2px 4px -1px rgba(0,0,0,0.03);position:relative;overflow:hidden}
             .bwn-card h2{margin-top:0;font-size:17px;color:#1f2937;border-bottom:2px solid #3b82f6;padding-bottom:12px;margin-bottom:20px}
             .bwn-field{margin-bottom:20px}
@@ -93,14 +103,14 @@ class BWN_Admin {
             
             /* Variables Styling */
             .bwn-vars-list{display:flex;flex-direction:column;gap:10px;max-height:450px;overflow-y:auto;padding-left:5px}
-            .bwn-var-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;transition:background 0.2s}
+            .bwn-var-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;transition:background 0.2s;min-width:0}
             .bwn-var-item:hover{background:#f3f4f6}
-            .bwn-var-badge{background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;padding:4px 10px;border-radius:6px;font-family:Consolas, Monaco, monospace;font-size:12px;font-weight:bold;cursor:pointer;user-select:none;transition:all 0.2s;direction:ltr;text-align:left}
+            .bwn-var-badge{background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;padding:4px 10px;border-radius:6px;font-family:Consolas, Monaco, monospace;font-size:12px;font-weight:bold;cursor:pointer;user-select:none;transition:all 0.2s;direction:ltr;text-align:left;word-break:break-all;max-width:55%}
             .bwn-var-badge:hover{background:#bae6fd;transform:scale(1.03)}
             .bwn-var-badge.copied{background:#dcfce7 !important;color:#15803d !important;border-color:#bbf7d0 !important}
             .bwn-var-badge.bwn-meta-badge{background:#f3e8ff;color:#6b21a8;border-color:#e9d5ff}
             .bwn-var-badge.bwn-meta-badge:hover{background:#e9d5ff}
-            .bwn-var-details{display:flex;flex-direction:column;align-items:flex-end;flex-grow:1;max-width:60%}
+            .bwn-var-details{display:flex;flex-direction:column;align-items:flex-end;flex-grow:1;max-width:60%;min-width:0}
             .bwn-var-label{font-size:12px;font-weight:600;color:#374151}
             .bwn-var-value{font-size:11px;color:#9ca3af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;text-align:left;direction:ltr}
         ' );
@@ -244,6 +254,16 @@ class BWN_Admin {
                                           placeholder="متن خود را با متغیرها اینجا بنویسید..."><?php echo esc_textarea( self::get_option('message_template', BWN_Notifier::get_default_message_template()) ); ?></textarea>
                                 <div class="description" style="direction:rtl;text-align:right;">
                                     می‌توانید از متغیرهای ستون سمت چپ در پیام استفاده کنید. در صورتی که این فیلد خالی بماند، از قالب پیش‌فرض استفاده خواهد شد.
+                                </div>
+                            </div>
+                            <div class="bwn-field">
+                                <label>📌 قالب پیام برای سفارش‌های ثبت‌شده توسط ادمین (لینک پرداخت)</label>
+                                <textarea name="<?php echo BWN_OPTIONS_KEY; ?>[message_template_manual]" rows="15"
+                                          placeholder="متن خود را با متغیرها اینجا بنویسید..."><?php echo esc_textarea( self::get_option('message_template_manual', BWN_Notifier::get_default_manual_message_template()) ); ?></textarea>
+                                <div class="description" style="direction:rtl;text-align:right;">
+                                    برای سفارش‌هایی که ادمین از طریق ابزار «لینک پرداخت» ثبت می‌کند (فروش واقعی در جای دیگری مثل اینستاگرام انجام شده و اینجا فقط فاکتور آن ثبت شده) به‌جای قالب بالا از این قالب استفاده می‌شود — این تشخیص خودکار است و نیازی به کاری از سمت ادمین ندارد.
+                                    اگر محصول این سفارش‌ها رسید پرداخت (از بخش «ضمیمه سفارش» در صفحه سفارش) داشته باشد، همان تصویر به‌همراه همین متن به‌عنوان توضیح تصویر برای بله ارسال می‌شود؛ در غیر این صورت فقط همین متن ارسال می‌شود.
+                                    از {receipt_url} برای لینک رسید و {is_manual_order} برای بله/خیر بودن سفارش دستی استفاده کنید. در صورتی که این فیلد خالی بماند، از قالب پیش‌فرض استفاده خواهد شد.
                                 </div>
                             </div>
                             <?php submit_button( 'ذخیره تنظیمات', 'primary', 'submit', false ); ?>

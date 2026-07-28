@@ -23,10 +23,45 @@ class BWN_Notifier {
             return;
         }
 
-        $message = self::build_message( $order );
-        $result  = self::send_to_bale( $message );
-        
+        $message   = self::build_message( $order );
+        $photo_url = self::get_receipt_photo_url( $order );
+
+        if ( $photo_url ) {
+            $result = self::send_photo( $photo_url, $message );
+            if ( ! $result['success'] ) {
+                // Bale couldn't fetch/accept the receipt image (unreachable
+                // URL, format, size, ...) — the order details still matter
+                // more than the receipt, so fall back to the plain text
+                // message instead of silently sending nothing.
+                $result = self::send_to_bale( $message );
+            }
+        } else {
+            $result = self::send_to_bale( $message );
+        }
+
         self::log_entry( $order_id, $result['success'], $result['error'] ?? '' );
+    }
+
+    /**
+     * The receipt photo only gets sent for orders created via the Payment
+     * Link tool (admin-recorded manual/Instagram sale, `_wpl_created_by`
+     * meta — see inc/payment-link/includes/class-order-handler.php in the
+     * theme) and only if one was actually attached via the existing
+     * "ضمیمه سفارش" metabox (`_order_image`, class-order-metabox.php) —
+     * that field isn't necessarily a receipt on a normal online order, so
+     * it's not treated as one there.
+     */
+    private static function get_receipt_photo_url( WC_Order $order ): string {
+        if ( ! self::is_manual_order( $order ) ) {
+            return '';
+        }
+        $image_id = (int) $order->get_meta( '_order_image' );
+        return $image_id ? (string) wp_get_attachment_url( $image_id ) : '';
+    }
+
+    /** Whether $order was created by an admin via the Payment Link tool rather than the normal storefront checkout. */
+    public static function is_manual_order( WC_Order $order ): bool {
+        return (bool) $order->get_meta( '_wpl_created_by' );
     }
 
     /**
@@ -69,15 +104,69 @@ class BWN_Notifier {
     }
 
     /**
+     * Send a photo via Bale Bot API's sendPhoto, by URL — per docs.bale.ai,
+     * `photo` accepts a plain HTTP(S) URL (Bale fetches it server-side,
+     * ≤5MB) alongside file_id/multipart, so the existing WP attachment URL
+     * from _order_image needs no re-upload. No `parse_mode` here (unlike
+     * sendMessage) — it isn't a documented sendPhoto parameter.
+     */
+    public static function send_photo( $photo_url, $caption ) {
+        $token   = BWN_Admin::get_option( 'bot_token' );
+        $chat_id = BWN_Admin::get_option( 'chat_id' );
+
+        if ( empty( $token ) || empty( $chat_id ) ) {
+            return array( 'success' => false, 'error' => 'توکن یا Chat ID تنظیم نشده است.' );
+        }
+
+        // Bale's documented caption limit is 4096 characters, same as sendMessage's text limit.
+        if ( function_exists( 'mb_substr' ) && mb_strlen( $caption ) > 4096 ) {
+            $caption = mb_substr( $caption, 0, 4096 );
+        }
+
+        $response = wp_remote_post(
+            BWN_BALE_API . $token . '/sendPhoto',
+            array(
+                'body'        => wp_json_encode( array(
+                    'chat_id' => $chat_id,
+                    'photo'   => $photo_url,
+                    'caption' => $caption,
+                ) ),
+                'headers'     => array( 'Content-Type' => 'application/json' ),
+                'timeout'     => 20,
+                'data_format' => 'body',
+            )
+        );
+
+        if ( is_wp_error( $response ) ) {
+            return array( 'success' => false, 'error' => $response->get_error_message() );
+        }
+
+        $code = wp_remote_retrieve_response_code( $response );
+        $json = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        if ( $code === 200 && ! empty( $json['ok'] ) ) {
+            return array( 'success' => true );
+        }
+
+        return array( 'success' => false, 'error' => $json['description'] ?? "HTTP {$code}" );
+    }
+
+    /**
      * Build message text by parsing placeholders and templates.
      */
     public static function build_message( WC_Order $order ) {
-        $template = BWN_Admin::get_option( 'message_template', '' );
-        
+        // Auto-selected per order (not a per-request toggle an admin has to
+        // remember) — every call site (real dispatch, the settings page's
+        // test button, anything else that calls build_message()) picks the
+        // right template for free just by which order gets passed in.
+        $is_manual   = self::is_manual_order( $order );
+        $option_key  = $is_manual ? 'message_template_manual' : 'message_template';
+        $template    = BWN_Admin::get_option( $option_key, '' );
+
         if ( empty( trim( $template ) ) ) {
-            $template = self::get_default_message_template();
+            $template = $is_manual ? self::get_default_manual_message_template() : self::get_default_message_template();
         }
-        
+
         $placeholders = self::get_available_placeholders( $order );
         $msg = $template;
         
@@ -141,6 +230,38 @@ class BWN_Notifier {
     }
 
     /**
+     * Default template for orders created by an admin via the Payment Link
+     * tool (a real sale that happened elsewhere — e.g. Instagram — recorded
+     * on the site afterward, not paid through the online gateway). Freely
+     * editable from the settings screen same as the normal template; this
+     * is just a sensible starting point.
+     */
+    public static function get_default_manual_message_template() {
+        return "📌 فاکتور دستی (ثبت‌شده توسط ادمین)
+
+{order_items}
+
+مجموع سبد خرید : {order_subtotal} {currency_symbol}
+هزینه ارسال : {order_shipping} {currency_symbol}
+
+مجموع : {order_total} {currency_symbol}
+{order_date}
+
+{customer_name}
+{billing_state}
+{billing_city}
+{billing_address}
+{billing_postcode}
+
+تلفن:
+{customer_phone}
+
+شماره سفارش : {order_id}
+
+رسید پرداخت : {receipt_url}";
+    }
+
+    /**
      * Map order values to standard placeholders.
      */
     public static function get_available_placeholders( $order ) {
@@ -165,6 +286,9 @@ class BWN_Notifier {
             'billing_address' => array( 'label' => 'آدرس خریدار', 'val' => '' ),
             'billing_postcode'=> array( 'label' => 'کد پستی خریدار', 'val' => '' ),
             'customer_note'   => array( 'label' => 'توضیحات سفارش', 'val' => '' ),
+
+            'is_manual_order' => array( 'label' => 'ثبت‌شده توسط ادمین؟ (بله/خیر)', 'val' => '' ),
+            'receipt_url'     => array( 'label' => 'لینک تصویر رسید (ضمیمه سفارش)', 'val' => '' ),
 
             'payment_method'       => array( 'label' => 'شناسه درگاه پرداخت', 'val' => '' ),
             'payment_method_title' => array( 'label' => 'نام درگاه پرداخت', 'val' => '' ),
@@ -211,6 +335,9 @@ class BWN_Notifier {
             $placeholders['billing_address']['val'] = trim( $order->get_billing_address_1() . ' ' . $order->get_billing_address_2() );
             $placeholders['billing_postcode']['val']= $order->get_billing_postcode();
             $placeholders['customer_note']['val']   = $order->get_customer_note();
+
+            $placeholders['is_manual_order']['val'] = self::is_manual_order( $order ) ? 'بله' : 'خیر';
+            $placeholders['receipt_url']['val']     = self::get_receipt_photo_url( $order );
 
             $placeholders['payment_method']['val']         = $order->get_payment_method();
             $placeholders['payment_method_title']['val']   = $order->get_payment_method_title();
