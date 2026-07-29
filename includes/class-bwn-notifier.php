@@ -452,7 +452,11 @@ class BWN_Notifier {
     public static function log_entry( $order_id, $success, $error = '' ) {
         $log   = self::get_log();
         $log[] = array(
-            'time'     => wp_date( 'Y-m-d H:i:s' ),
+            // Not wp_date() — filterable, same reasoning as
+            // BWN_Jalali::timestamp_to_jalali(). This is an internal
+            // machine log; it should stay a plain, unambiguous Gregorian
+            // timestamp regardless of any admin-side Jalali display filter.
+            'time'     => ( new DateTime( 'now', wp_timezone() ) )->format( 'Y-m-d H:i:s' ),
             'order_id' => $order_id,
             'success'  => $success,
             'error'    => $error,

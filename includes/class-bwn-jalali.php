@@ -19,9 +19,24 @@ class BWN_Jalali {
      * Convert timestamp to Jalali string.
      */
     public static function timestamp_to_jalali( $timestamp ) {
-        $gy = (int) wp_date( 'Y', $timestamp );
-        $gm = (int) wp_date( 'n', $timestamp );
-        $gd = (int) wp_date( 'j', $timestamp );
+        // Not wp_date() — its output is filterable, and the theme's own
+        // admin-side Jalali display (Formol1\Core\JalaliAdmin) hooks the
+        // `wp_date` filter whenever is_admin() is true. An order update is
+        // itself an admin-context request, so calling wp_date('Y'/'n'/'j',
+        // ...) here would come back already Jalali-converted, and
+        // from_gregorian() below would convert those digits a *second*
+        // time — corrupting the result (this is what produced the wrong
+        // {order_date} in notification messages). A plain DateTime in the
+        // site's real timezone gives the true Gregorian Y/M/D
+        // unconditionally, bypassing every filter — for these three purely
+        // numeric format characters that's exactly what wp_date() itself
+        // computes internally before any filter runs.
+        $dt = new DateTime( '@' . $timestamp );
+        $dt->setTimezone( wp_timezone() );
+
+        $gy = (int) $dt->format( 'Y' );
+        $gm = (int) $dt->format( 'n' );
+        $gd = (int) $dt->format( 'j' );
 
         return self::from_gregorian( $gy, $gm, $gd );
     }
