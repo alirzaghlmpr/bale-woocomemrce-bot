@@ -3,7 +3,7 @@
  * Plugin Name: Bale WooCommerce Notifier
  * Plugin URI:  https://sport-formol1.com
  * Description: ارسال خودکار جزئیات سفارشات WooCommerce به گروه بله هنگام تغییر وضعیت به Processing به همراه امکان سفارشی‌سازی متن پیام
- * Version:     1.4.0
+ * Version:     1.4.1
  * Author:      Sport Formol1
  * Text Domain: bale-woo-notifier
  * Requires at least: 5.8
