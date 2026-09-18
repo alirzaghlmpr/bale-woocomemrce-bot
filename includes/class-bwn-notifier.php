@@ -315,6 +315,11 @@ class BWN_Notifier {
                 $price    = number_format( (float) $order->get_item_subtotal( $item, false, true ) );
                 $url      = $product ? get_permalink( $product->get_id() ) : '';
 
+                $variation = self::get_item_variation_text( $item );
+                if ( '' !== $variation ) {
+                    $name = self::get_item_base_name( $item ) . "\n" . $variation;
+                }
+
                 $items_text .= "{$name}\n{$price} {$currency} × {$qty}\n\n";
                 if ( $url ) $links_text .= "{$name}\n{$url}\n\n";
             }
@@ -354,6 +359,35 @@ class BWN_Notifier {
         }
 
         return $placeholders;
+    }
+
+    /**
+     * Product name without the "- attr1, attr2" suffix WooCommerce appends to variation names.
+     */
+    private static function get_item_base_name( $item ) {
+        $parent = wc_get_product( $item->get_product_id() );
+        return $parent ? $parent->get_name() : $item->get_name();
+    }
+
+    /**
+     * Selected variation attributes of a line item, e.g. "رنگ : قرمز ، پایه : 9005".
+     * Returns '' for non-variable items.
+     */
+    private static function get_item_variation_text( $item ) {
+        if ( ! $item->get_variation_id() ) {
+            return '';
+        }
+
+        $parts = array();
+        foreach ( $item->get_formatted_meta_data() as $meta ) {
+            $key   = trim( wp_strip_all_tags( $meta->display_key ) );
+            $value = trim( preg_replace( '/\s+/u', ' ', wp_strip_all_tags( $meta->display_value ) ) );
+            if ( '' !== $key && '' !== $value ) {
+                $parts[] = "{$key} : {$value}";
+            }
+        }
+
+        return implode( ' ، ', $parts );
     }
 
     /**
