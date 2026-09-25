@@ -298,7 +298,7 @@ class BWN_Notifier {
         $placeholders = array_merge( $placeholders, self::get_attribution_placeholder_defs() );
 
         if ( $order ) {
-            $currency = get_woocommerce_currency_symbol();
+            $currency = html_entity_decode( get_woocommerce_currency_symbol(), ENT_QUOTES, 'UTF-8' );
             
             $placeholders['order_id']['val']        = $order->get_id();
             $placeholders['order_number']['val']    = $order->get_order_number();
@@ -378,8 +378,9 @@ class BWN_Notifier {
             return '';
         }
 
+        // $include_all: by default WooCommerce hides attribute values that already appear in the item name ("… - H4").
         $parts = array();
-        foreach ( $item->get_formatted_meta_data() as $meta ) {
+        foreach ( $item->get_formatted_meta_data( '_', true ) as $meta ) {
             $key   = trim( wp_strip_all_tags( $meta->display_key ) );
             $value = trim( preg_replace( '/\s+/u', ' ', wp_strip_all_tags( $meta->display_value ) ) );
             if ( '' !== $key && '' !== $value ) {
