@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="icon.png" alt="Bale WooCommerce Notifier icon" width="128" height="128">
+</p>
+
 # Bale WooCommerce Notifier
 
 Automatically send WooCommerce order details to a [Bale](https://bale.ai) group the moment an order moves to **Processing** — with a fully customizable message template.
